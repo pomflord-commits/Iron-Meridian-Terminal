@@ -19,7 +19,7 @@ A local AI interface for Ollama inspired by:
 
 ## Install
 
-git clone https://github.com/YOURUSERNAME/iron-meridian-terminal.git
+git clone https://github.com/pomflord-commits/Iron-Meridian-Terminal.git
 
 cd iron-meridian-terminal
 
