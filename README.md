@@ -1,5 +1,7 @@
 # Iron Meridian Terminal
 
+<img src="main-ui.png" width="1000">
+
 A local AI interface for Ollama inspired by:
 
 - SUPERHOT
