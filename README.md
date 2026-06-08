@@ -24,3 +24,9 @@ cd iron-meridian-terminal
 npm install
 
 npm run dev
+
+
+## Requires
+
+- Node.js
+- Ollama
