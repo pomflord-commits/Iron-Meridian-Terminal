@@ -30,3 +30,6 @@ npm run dev
 
 - Node.js
 - Ollama
+
+
+Iron-Meridian-Terminal/main-ui.png
