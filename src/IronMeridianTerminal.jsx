@@ -169,8 +169,8 @@ const VRAMBar = ({ used, total }) => {
 };
 
 // ── Interactive Stat Box ──────────────────────────────────────────────────────
-const StatBox = ({ label, value, onClick, interactive }) => (
-  <div className={`stat-box ${interactive?"stat-box--interactive":""}`} onClick={onClick} title={interactive?"Click to adjust":undefined}>
+const StatBox = ({ label, value, onClick, interactive, btnRef }) => (
+  <div ref={btnRef} className={`stat-box ${interactive?"stat-box--interactive":""}`} onClick={onClick} title={interactive?"Click to adjust":undefined}>
     <div className="stat-label">{label}{interactive && <span className="stat-edit-hint"> ✎</span>}</div>
     <div className="stat-value">{value}</div>
   </div>
@@ -180,19 +180,35 @@ const StatBox = ({ label, value, onClick, interactive }) => (
 const SettingsPopup = ({ anchor, label, type, min, max, step, value, onChange, onClose }) => {
   const [draft, setDraft] = useState(value);
   const ref = useRef(null);
+  // Keep a stable ref to onClose so the effect never needs to re-run
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   useEffect(() => { setDraft(value); }, [value]);
+
   useEffect(() => {
-    const handler = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
-    setTimeout(() => document.addEventListener("mousedown", handler), 0);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+    // Use a short delay so the mousedown that opened the popup doesn't
+    // immediately re-trigger the outside-click handler on the same frame.
+    let active = false;
+    const tid = setTimeout(() => { active = true; }, 80);
+    const handler = e => {
+      if (!active) return;
+      if (ref.current && !ref.current.contains(e.target)) {
+        onCloseRef.current();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => { clearTimeout(tid); document.removeEventListener("mousedown", handler); };
+  // Empty deps: register once on mount, use the stable ref for the callback
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const apply = () => { onChange(draft); onClose(); };
-  const pct = type === "slider" ? ((draft - min) / (max - min)) * 100 : 0;
 
   return (
-    <div className="settings-popup" ref={ref} style={anchor}>
+    <div className="settings-popup" ref={ref} style={anchor}
+      // Stop any mousedown inside the popup from bubbling to the document
+      // handler above — belt-and-suspenders safety
+      onMouseDown={e => e.stopPropagation()}>
       <div className="settings-popup-title">{label}</div>
       <div className="settings-popup-divider" />
       {type === "slider" ? (
@@ -211,7 +227,7 @@ const SettingsPopup = ({ anchor, label, type, min, max, step, value, onChange, o
         <input
           type="number" min={min} max={max} step={step}
           value={draft}
-          onChange={e => setDraft(parseInt(e.target.value)||min)}
+          onChange={e => setDraft(parseInt(e.target.value) || min)}
           className="settings-number"
         />
       )}
@@ -312,37 +328,57 @@ const Scanlines = () => (
   <div className="scanlines" aria-hidden="true"><div className="scanlines-inner"/></div>
 );
 
-// ── Main App ──────────────────────────────────────────────────────────────────
-export default function IronMeridianTerminal() {
-  const [chats, setChats] = useState([
-    { id:1, title:"Mech Design Concepts", preview:"Help me design a combat mech...", time:"23:49", messages:[
+// ── Default settings for a new chat ──────────────────────────────────────────
+const DEFAULT_CHAT_SETTINGS = { temperature: 0.7, topP: 0.95, maxTokens: 2048 };
+
+function hydrateChats(raw) {
+  // Ensure every chat has settings fields (handles older stored data)
+  return raw.map(c => ({
+    ...DEFAULT_CHAT_SETTINGS,
+    ...c,
+  }));
+}
+
+const INITIAL_CHATS = hydrateChats([
+  { id:1, title:"Mech Design Concepts", preview:"Help me design a combat mech...", time:"23:49",
+    temperature:0.7, topP:0.95, maxTokens:2048,
+    messages:[
       {role:"user",content:"Help me design a combat mech for close range urban warfare.",time:"23:49"},
       {role:"assistant",content:"Designing a close-range urban combat mech requires a focus on maneuverability, armor, and devastating short-range weaponry.\n\nHere's a concept:\n\n> Role: Shock Assault / Breacher\n> Height: 4.2m\n> Weight: 8.7 tons\n> Chassis: Reinforced composite armor with reactive plating\n> Power Plant: Compact fusion core\n> Mobility: Hydraulic legs with enhanced jump jets for vertical movement\n\n> Armament:\n  - 2x Chainshot Shotguns (Primary)\n  - 1x Thermal Blade (Melee)\n  - 4x Smoke Grenade Launchers\n\n> Systems:\n  - Advanced target acquisition\n  - Urban terrain mapping\n  - Low-signature movement mode\n\nThis mech is built to dominate tight corridors and close-quarters engagements.",time:"23:49"},
       {role:"user",content:"Generate a blueprint of this mech.",time:"23:50"},
     ]},
-    {id:2,title:"Gothic Castle Blueprint",preview:"Create a gothic castle bluep...",time:"21:17",messages:[]},
-    {id:3,title:"AI System Prompts",preview:"Act as a battle-hardened tact...",time:"19:02",messages:[]},
-    {id:4,title:"Dragon Lore & History",preview:"Tell me the history of the iro...",time:"Yesterday",messages:[]},
-    {id:5,title:"Laser Weapons Research",preview:"Explain the physics behind...",time:"Yesterday",messages:[]},
-    {id:6,title:"The Black Cathedral",preview:"Describe the architecture...",time:"2d ago",messages:[]},
-    {id:7,title:"Coding Help: C++",preview:"How do I optimize this loop...",time:"3d ago",messages:[]},
-  ]);
-  const [activeChatId, setActiveChatId] = useState(1);
+  {id:2,title:"Gothic Castle Blueprint",preview:"Create a gothic castle bluep...",time:"21:17",temperature:0.9,topP:0.95,maxTokens:2048,messages:[]},
+  {id:3,title:"AI System Prompts",preview:"Act as a battle-hardened tact...",time:"19:02",temperature:0.5,topP:0.9,maxTokens:1024,messages:[]},
+  {id:4,title:"Dragon Lore & History",preview:"Tell me the history of the iro...",time:"Yesterday",temperature:0.85,topP:0.95,maxTokens:2048,messages:[]},
+  {id:5,title:"Laser Weapons Research",preview:"Explain the physics behind...",time:"Yesterday",temperature:0.3,topP:0.9,maxTokens:2048,messages:[]},
+  {id:6,title:"The Black Cathedral",preview:"Describe the architecture...",time:"2d ago",temperature:0.9,topP:0.98,maxTokens:4096,messages:[]},
+  {id:7,title:"Coding Help: C++",preview:"How do I optimize this loop...",time:"3d ago",temperature:0.2,topP:0.85,maxTokens:2048,messages:[]},
+]);
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+export default function IronMeridianTerminal() {
+  const [chats, setChats] = useState(() => {
+    try {
+      const stored = localStorage.getItem("im_chats");
+      if (stored) return hydrateChats(JSON.parse(stored));
+    } catch {}
+    return INITIAL_CHATS;
+  });
+  const [activeChatId, setActiveChatId] = useState(() => {
+    try { return parseInt(localStorage.getItem("im_active_chat")) || 1; } catch { return 1; }
+  });
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [ollamaModels, setOllamaModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState("SUPERGEMMA4-26B");
-  const [temperature, setTemperature] = useState(0.7);
-  const [topP, setTopP] = useState(0.95);
-  const [maxTokens, setMaxTokens] = useState(2048);
   const [contextTokens, setContextTokens] = useState(8192);
   const [vramUsed, setVramUsed] = useState(0);
   const [vramTotal, setVramTotal] = useState(0);
   const [loadedModelName, setLoadedModelName] = useState("");
   const [ollamaStatus, setOllamaStatus] = useState("CHECKING");
   const [searchQuery, setSearchQuery] = useState("");
-  // Popup: "temp" | "topp" | "maxtok" | null
   const [openPopup, setOpenPopup] = useState(null);
+  const [popupAnchor, setPopupAnchor] = useState({ top: 62, left: 400 });
   const [showSysPrompt, setShowSysPrompt] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState(
     () => localStorage.getItem("im_system_prompt") || ""
@@ -350,9 +386,36 @@ export default function IronMeridianTerminal() {
   const chatEndRef = useRef(null);
   const abortRef = useRef(null);
   const textareaRef = useRef(null);
+  const tempBtnRef = useRef(null);
+  const toppBtnRef = useRef(null);
+  const maxTokBtnRef = useRef(null);
 
-  const activeChat = chats.find(c => c.id===activeChatId);
-  const blueprintType = detectBlueprintType(activeChat?.messages||[]);
+  const getPopupAnchor = (ref) => {
+    if (!ref.current) return { top: 62, left: 400 };
+    const r = ref.current.getBoundingClientRect();
+    return { top: r.bottom + 4, left: r.left };
+  };
+
+  const activeChat = chats.find(c => c.id === activeChatId) || chats[0];
+  const blueprintType = detectBlueprintType(activeChat?.messages || []);
+
+  // Derive per-chat settings from the active chat
+  const temperature = activeChat?.temperature ?? DEFAULT_CHAT_SETTINGS.temperature;
+  const topP        = activeChat?.topP        ?? DEFAULT_CHAT_SETTINGS.topP;
+  const maxTokens   = activeChat?.maxTokens   ?? DEFAULT_CHAT_SETTINGS.maxTokens;
+
+  // Helper: write a settings field back into the active chat
+  const setChatSetting = useCallback((key, val) => {
+    setChats(prev => prev.map(c => c.id !== activeChatId ? c : { ...c, [key]: val }));
+  }, [activeChatId]);
+
+  // ── Persist chats + active chat to localStorage ──
+  useEffect(() => {
+    try { localStorage.setItem("im_chats", JSON.stringify(chats)); } catch {}
+  }, [chats]);
+  useEffect(() => {
+    try { localStorage.setItem("im_active_chat", String(activeChatId)); } catch {}
+  }, [activeChatId]);
 
   // ── Persist system prompt ──
   useEffect(() => { localStorage.setItem("im_system_prompt", systemPrompt); }, [systemPrompt]);
@@ -404,9 +467,15 @@ export default function IronMeridianTerminal() {
 
   const newChat = () => {
     const id = Date.now();
-    setChats(prev => [{id,title:"New Session",preview:"—",time:"now",messages:[]},...prev]);
+    setChats(prev => [{
+      id, title:"New Session", preview:"—", time:"now", messages:[],
+      ...DEFAULT_CHAT_SETTINGS,
+    }, ...prev]);
     setActiveChatId(id);
+    setOpenPopup(null);
   };
+
+  const switchChat = (id) => { setActiveChatId(id); setOpenPopup(null); };
 
   const sendMessage = useCallback(async () => {
     if (!input.trim()||isStreaming) return;
@@ -454,7 +523,7 @@ export default function IronMeridianTerminal() {
     } catch(err) {
       if (err.name!=="AbortError") setChats(prev=>prev.map(c=>c.id!==activeChatId?c:{...c,messages:c.messages.map(m=>m.id===aiMsgId?{...m,content:"[SIGNAL LOST — OLLAMA UNREACHABLE]\n\nEnsure Ollama is running: `ollama serve`"}:m)}));
     } finally { setIsStreaming(false); abortRef.current=null; }
-  }, [input,isStreaming,chats,activeChatId,selectedModel,temperature,topP,maxTokens,systemPrompt]);
+  }, [input,isStreaming,chats,activeChatId,selectedModel,temperature,topP,maxTokens,systemPrompt,activeChat]);
 
   const stopGeneration = () => { abortRef.current?.abort(); };
   const filteredChats = chats.filter(c => !searchQuery||c.title.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -782,24 +851,24 @@ export default function IronMeridianTerminal() {
         .status-dot{width:5px;height:5px;border-radius:50%;background:#22cc44;display:inline-block;margin-right:5px;box-shadow:0 0 4px #22cc44;}
       `}</style>
 
-      <div className="terminal" onClick={() => setOpenPopup(null)}>
+      <div className="terminal">
         <Scanlines/>
 
         {/* ── Settings Popups ── */}
         {openPopup==="temp" && (
-          <SettingsPopup anchor={{top:62,left:400}} label="TEMPERATURE" type="slider"
+          <SettingsPopup anchor={popupAnchor} label="TEMPERATURE" type="slider"
             min={0} max={2} step={0.01} value={temperature}
-            onChange={setTemperature} onClose={()=>setOpenPopup(null)}/>
+            onChange={v => setChatSetting("temperature", v)} onClose={()=>setOpenPopup(null)}/>
         )}
         {openPopup==="topp" && (
-          <SettingsPopup anchor={{top:62,left:490}} label="TOP_P" type="slider"
+          <SettingsPopup anchor={popupAnchor} label="TOP_P" type="slider"
             min={0} max={1} step={0.01} value={topP}
-            onChange={setTopP} onClose={()=>setOpenPopup(null)}/>
+            onChange={v => setChatSetting("topP", v)} onClose={()=>setOpenPopup(null)}/>
         )}
         {openPopup==="maxtok" && (
-          <SettingsPopup anchor={{top:62,left:570}} label="MAX TOKENS" type="number"
+          <SettingsPopup anchor={popupAnchor} label="MAX TOKENS" type="number"
             min={64} max={32768} step={64} value={maxTokens}
-            onChange={setMaxTokens} onClose={()=>setOpenPopup(null)}/>
+            onChange={v => setChatSetting("maxTokens", v)} onClose={()=>setOpenPopup(null)}/>
         )}
 
         {/* ── System Prompt Modal ── */}
@@ -812,7 +881,7 @@ export default function IronMeridianTerminal() {
         )}
 
         {/* ── Top Bar ── */}
-        <header className="topbar" onClick={e=>e.stopPropagation()}>
+        <header className="topbar">
           <div className="brand">
             <svg className="brand-icon" viewBox="0 0 36 36" fill="none">
               <polygon points="18,2 22,8 30,6 28,14 34,18 28,22 30,30 22,28 18,34 14,28 6,30 8,22 2,18 8,14 6,6 14,8" stroke="#cc2200" strokeWidth="1.2" fill="none"/>
@@ -827,12 +896,12 @@ export default function IronMeridianTerminal() {
           <div className="topbar-divider"/>
           <StatBox label="MODEL" value={selectedModel}/>
           <StatBox label="CONTEXT" value={`${contextTokens.toLocaleString()} TOKENS`}/>
-          <StatBox label="TEMP" value={temperature.toFixed(2)} interactive
-            onClick={e=>{e.stopPropagation();setOpenPopup(p=>p==="temp"?null:"temp");}}/>
-          <StatBox label="TOP_P" value={topP.toFixed(2)} interactive
-            onClick={e=>{e.stopPropagation();setOpenPopup(p=>p==="topp"?null:"topp");}}/>
-          <StatBox label="MAX TOKENS" value={maxTokens.toLocaleString()} interactive
-            onClick={e=>{e.stopPropagation();setOpenPopup(p=>p==="maxtok"?null:"maxtok");}}/>
+          <StatBox label="TEMP" value={temperature.toFixed(2)} interactive btnRef={tempBtnRef}
+            onClick={()=>{ setPopupAnchor(getPopupAnchor(tempBtnRef)); setOpenPopup(p=>p==="temp"?null:"temp"); }}/>
+          <StatBox label="TOP_P" value={topP.toFixed(2)} interactive btnRef={toppBtnRef}
+            onClick={()=>{ setPopupAnchor(getPopupAnchor(toppBtnRef)); setOpenPopup(p=>p==="topp"?null:"topp"); }}/>
+          <StatBox label="MAX TOKENS" value={maxTokens.toLocaleString()} interactive btnRef={maxTokBtnRef}
+            onClick={()=>{ setPopupAnchor(getPopupAnchor(maxTokBtnRef)); setOpenPopup(p=>p==="maxtok"?null:"maxtok"); }}/>
           <div className="topbar-spacer"/>
           <div className="system-status">
             <span className="sys-label">OLLAMA</span>
@@ -859,7 +928,7 @@ export default function IronMeridianTerminal() {
               value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/>
           </div>
           <div className="chat-list">
-            {filteredChats.map(c => <ChatItem key={c.id} chat={c} active={c.id===activeChatId} onClick={()=>setActiveChatId(c.id)}/>)}
+            {filteredChats.map(c => <ChatItem key={c.id} chat={c} active={c.id===activeChatId} onClick={()=>switchChat(c.id)}/>)}
           </div>
           <div className="model-panel">
             <div className="model-panel-label">// CURRENT MODEL</div>
