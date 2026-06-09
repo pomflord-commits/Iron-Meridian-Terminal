@@ -497,182 +497,31 @@ const SettingsPopup = ({ anchor, label, type, min, max, step, value, onChange, o
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PROMPT MANAGER
-// Global named directives + per-chat active directive selection.
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const PromptManager = ({ globalPrompts, onSaveGlobals, chatPrompt, onSaveChatPrompt, onClose }) => {
-  const [globals, setGlobals]       = useState(globalPrompts);
-  const [editingId, setEditingId]   = useState(null);   // id of global being edited
-  const [editDraft, setEditDraft]   = useState("");
-  const [editName, setEditName]     = useState("");
-  const [activeTab, setActiveTab]   = useState("library"); // library | active
-  // Chat-level directive state
-  const [chatMode, setChatMode]     = useState(chatPrompt.mode);   // "none"|"global"|"custom"
-  const [chatGlobalId, setChatGlobalId] = useState(chatPrompt.globalId || null);
-  const [chatCustom, setChatCustom] = useState(chatPrompt.custom  || "");
-
-  const addNew = () => {
-    const id = Date.now();
-    const fresh = [...globals, {id, name:"NEW DIRECTIVE", content:""}];
-    setGlobals(fresh);
-    setEditingId(id); setEditName("NEW DIRECTIVE"); setEditDraft("");
-  };
-
-  const saveEdit = () => {
-    setGlobals(prev => prev.map(p => p.id===editingId
-      ? {...p, name:editName.toUpperCase().trim()||"UNNAMED", content:editDraft}
-      : p));
-    setEditingId(null);
-  };
-
-  const deletePrompt = (id) => {
-    setGlobals(prev => prev.filter(p => p.id !== id));
-    if (chatGlobalId === id) { setChatMode("none"); setChatGlobalId(null); }
-  };
-
-  const saveAll = () => {
-    const saved = editingId
-      ? globals.map(p => p.id===editingId ? {...p,name:editName.toUpperCase().trim()||"UNNAMED",content:editDraft} : p)
-      : globals;
-    onSaveGlobals(saved);
-    onSaveChatPrompt({ mode:chatMode, globalId:chatGlobalId, custom:chatCustom });
-    onClose();
-  };
-
-  const editing = globals.find(p => p.id === editingId);
-
+const SystemPromptModal = ({ value, onChange, onClose }) => {
+  const [draft, setDraft] = useState(value);
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal-panel" style={{width:"720px",maxWidth:"95vw"}}>
+    <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="modal-panel">
         <div className="modal-header">
-          <span className="modal-title">// DIRECTIVE MANAGER</span>
+          <span className="modal-title">// SYSTEM PROMPT</span>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
-
-        {/* Tabs */}
-        <div className="import-tabs">
-          <button className={`import-tab ${activeTab==="library"?"import-tab--active":""}`} onClick={()=>setActiveTab("library")}>GLOBAL LIBRARY</button>
-          <button className={`import-tab ${activeTab==="active"?"import-tab--active":""}`} onClick={()=>setActiveTab("active")}>ACTIVE DIRECTIVE</button>
+        <div className="modal-body">
+          <div className="modal-desc">Injected as <span style={{color:"var(--red)"}}>role: "system"</span> before all user messages.</div>
+          <textarea className="modal-textarea" value={draft} onChange={e=>setDraft(e.target.value)}
+            placeholder="You are Iron Meridian, a battle-hardened tactical AI..." spellCheck={false}/>
         </div>
-
-        {activeTab==="library" && (
-          <div style={{display:"flex",flex:1,overflow:"hidden",minHeight:"320px"}}>
-            {/* List */}
-            <div style={{width:"220px",borderRight:"1px solid var(--border)",display:"flex",flexDirection:"column"}}>
-              <div style={{padding:"8px",borderBottom:"1px solid var(--border)"}}>
-                <button className="modal-btn" style={{width:"100%"}} onClick={addNew}>+ NEW DIRECTIVE</button>
-              </div>
-              <div style={{flex:1,overflowY:"auto",scrollbarWidth:"thin"}}>
-                {globals.length===0 && <div style={{padding:"12px",fontSize:"9px",color:"var(--text-dim)",letterSpacing:".1em"}}>NO DIRECTIVES</div>}
-                {globals.map(p=>(
-                  <div key={p.id}
-                    className={`pm-list-item ${editingId===p.id?"pm-list-item--active":""}`}
-                    onClick={()=>{if(editingId&&editingId!==p.id)saveEdit();setEditingId(p.id);setEditName(p.name);setEditDraft(p.content);}}>
-                    <span className="pm-list-name">{p.name}</span>
-                    <button className="pm-list-del" onClick={e=>{e.stopPropagation();deletePrompt(p.id);}}>✕</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {/* Editor */}
-            <div style={{flex:1,display:"flex",flexDirection:"column",padding:"12px",gap:"8px"}}>
-              {editingId ? (<>
-                <input className="pm-name-input" value={editName} onChange={e=>setEditName(e.target.value.toUpperCase())} placeholder="DIRECTIVE NAME"/>
-                <textarea className="modal-textarea" style={{flex:1,minHeight:"200px"}}
-                  value={editDraft} onChange={e=>setEditDraft(e.target.value)}
-                  placeholder="Write the directive content here..."/>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{fontSize:"9px",color:"var(--text-dim)"}}>{editDraft.length} chars</span>
-                  <button className="modal-btn" onClick={saveEdit}>[ SAVE ]</button>
-                </div>
-              </>) : (
-                <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",color:"var(--text-dim)",fontSize:"10px",letterSpacing:".1em"}}>
-                  SELECT A DIRECTIVE TO EDIT
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab==="active" && (
-          <div style={{padding:"16px",minHeight:"320px",display:"flex",flexDirection:"column",gap:"6px"}}>
-            <div style={{fontSize:"9px",color:"var(--text-dim)",letterSpacing:".08em",lineHeight:1.6,marginBottom:"6px"}}>
-              Choose what directive is injected for this conversation.
-            </div>
-
-            {/* None */}
-            <div className={`directive-opt ${chatMode==="none"?"directive-opt--active":""}`}
-              onClick={()=>setChatMode("none")}>
-              <div className="directive-opt-radio"/>
-              <div className="directive-opt-body">
-                <span className="directive-opt-label">NO DIRECTIVE</span>
-                <span className="directive-opt-desc">No system prompt injected.</span>
-              </div>
-            </div>
-
-            {/* Global */}
-            <div className={`directive-opt ${chatMode==="global"?"directive-opt--active":""}`}
-              onClick={()=>setChatMode("global")}>
-              <div className="directive-opt-radio"/>
-              <div className="directive-opt-body">
-                <span className="directive-opt-label">GLOBAL DIRECTIVE</span>
-                <span className="directive-opt-desc">Use a directive from the library.</span>
-              </div>
-            </div>
-            {chatMode==="global" && (
-              <div style={{display:"flex",flexDirection:"column",gap:"3px",marginTop:"2px"}}>
-                {globals.length===0
-                  ? <span style={{fontSize:"9px",color:"var(--text-dim)",padding:"6px 0"}}>No global directives — add one in the Library tab.</span>
-                  : globals.map(p=>(
-                    <div key={p.id}
-                      className={`directive-opt directive-opt--sub ${chatGlobalId===p.id?"directive-opt--active":""}`}
-                      onClick={e=>{e.stopPropagation();setChatGlobalId(p.id);}}>
-                      <div className="directive-opt-radio"/>
-                      <div className="directive-opt-body">
-                        <span className="directive-opt-label">{p.name}</span>
-                        <span className="directive-opt-desc">{p.content.slice(0,72)}{p.content.length>72?"…":""}</span>
-                      </div>
-                    </div>
-                  ))
-                }
-              </div>
-            )}
-
-            {/* Custom */}
-            <div className={`directive-opt ${chatMode==="custom"?"directive-opt--active":""}`}
-              onClick={()=>setChatMode("custom")}>
-              <div className="directive-opt-radio"/>
-              <div className="directive-opt-body">
-                <span className="directive-opt-label">CUSTOM — THIS CHAT ONLY</span>
-                <span className="directive-opt-desc">Write a directive specific to this conversation.</span>
-              </div>
-            </div>
-            {chatMode==="custom" && (
-              <textarea className="modal-textarea" style={{height:"130px",marginTop:"2px"}}
-                value={chatCustom} onChange={e=>setChatCustom(e.target.value)}
-                placeholder="Write a directive specific to this conversation..."
-                onClick={e=>e.stopPropagation()}/>
-            )}
-          </div>
-        )}
-
         <div className="modal-footer">
-          <span className="modal-hint">{globals.length} global directive{globals.length!==1?"s":""}</span>
-          <button className="modal-btn" onClick={saveAll}>[ SAVE &amp; CLOSE ]</button>
+          <span className="modal-hint">{draft.length} chars</span>
+          <div style={{display:"flex",gap:"8px"}}>
+            <button className="modal-btn modal-btn--ghost" onClick={()=>setDraft("")}>CLEAR</button>
+            <button className="modal-btn" onClick={()=>{onChange(draft);onClose();}}>[ SAVE DIRECTIVE ]</button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// MARKDOWN RENDERER
-// Custom Iron Meridian styled markdown — no external dependencies.
-// Handles: headers, bold, italic, inline code, blockquotes, ordered +
-// unordered lists, horizontal rules, and fenced code blocks.
-// ═══════════════════════════════════════════════════════════════════════════════
 
 const CodeBlock = ({ code, lang }) => {
   const [copied, setCopied] = useState(false);
@@ -685,315 +534,34 @@ const CodeBlock = ({ code, lang }) => {
   );
 };
 
-// Render inline markdown: **bold**, *italic*, `code`, ~~strike~~
-function renderInline(text) {
-  const parts = [];
-  const re = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~)/g;
-  let last = 0, m, key = 0;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) parts.push(<span key={key++}>{text.slice(last, m.index)}</span>);
-    const t = m[0];
-    if (t.startsWith('`'))        parts.push(<code key={key++} className="md-inline-code">{t.slice(1,-1)}</code>);
-    else if (t.startsWith('**'))  parts.push(<strong key={key++} className="md-bold">{t.slice(2,-2)}</strong>);
-    else if (t.startsWith('*'))   parts.push(<em key={key++} className="md-italic">{t.slice(1,-1)}</em>);
-    else if (t.startsWith('~~'))  parts.push(<span key={key++} className="md-strike">{t.slice(2,-2)}</span>);
-    last = m.index + t.length;
-  }
-  if (last < text.length) parts.push(<span key={key++}>{text.slice(last)}</span>);
-  return parts;
+function renderContent(text) {
+  const parts=[]; const re=/```(\w*)\n?([\s\S]*?)```/g; let last=0,m;
+  while((m=re.exec(text))!==null){if(m.index>last)parts.push({type:"text",content:text.slice(last,m.index)});parts.push({type:"code",lang:m[1],content:m[2]});last=m.index+m[0].length;}
+  if(last<text.length)parts.push({type:"text",content:text.slice(last)});
+  return parts.map((p,i)=>p.type==="code"?<CodeBlock key={i} code={p.content} lang={p.lang}/>:<span key={i} className="msg-text">{p.content.split("\n").map((l,j)=><span key={j}>{l}<br/></span>)}</span>);
 }
 
-function renderMarkdown(text) {
-  // Extract fenced code blocks first
-  const segments = [];
-  const codeRe = /```(\w*)\n?([\s\S]*?)```/g;
-  let last = 0, m;
-  while ((m = codeRe.exec(text)) !== null) {
-    if (m.index > last) segments.push({ type: "md", content: text.slice(last, m.index) });
-    segments.push({ type: "code", lang: m[1], content: m[2] });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) segments.push({ type: "md", content: text.slice(last) });
-
-  const elements = [];
-  let key = 0;
-
-  segments.forEach(seg => {
-    if (seg.type === "code") {
-      elements.push(<CodeBlock key={key++} code={seg.content} lang={seg.lang}/>);
-      return;
-    }
-
-    // Process markdown lines
-    const lines = seg.content.split("\n");
-    let i = 0;
-    while (i < lines.length) {
-      const line = lines[i];
-
-      // Blank line
-      if (!line.trim()) { i++; continue; }
-
-      // Horizontal rule
-      if (/^[-*_]{3,}$/.test(line.trim())) {
-        elements.push(<hr key={key++} className="md-hr"/>);
-        i++; continue;
-      }
-
-      // ATX Headings
-      const h = line.match(/^(#{1,4})\s+(.+)/);
-      if (h) {
-        const level = h[1].length;
-        const Tag = `h${Math.min(level+1,4)}`; // h2-h5 mapped to smaller sizes
-        elements.push(<Tag key={key++} className={`md-h md-h${level}`}>{renderInline(h[2])}</Tag>);
-        i++; continue;
-      }
-
-      // Blockquote
-      if (line.startsWith(">")) {
-        const bqLines = [];
-        while (i < lines.length && lines[i].startsWith(">")) {
-          bqLines.push(lines[i].replace(/^>\s?/, ""));
-          i++;
-        }
-        elements.push(<blockquote key={key++} className="md-blockquote">{bqLines.map((l,j)=><span key={j}>{renderInline(l)}<br/></span>)}</blockquote>);
-        continue;
-      }
-
-      // Unordered list
-      if (/^[-*+]\s/.test(line)) {
-        const items = [];
-        while (i < lines.length && /^[-*+]\s/.test(lines[i])) {
-          items.push(lines[i].replace(/^[-*+]\s/, ""));
-          i++;
-        }
-        elements.push(<ul key={key++} className="md-ul">{items.map((it,j)=><li key={j} className="md-li">{renderInline(it)}</li>)}</ul>);
-        continue;
-      }
-
-      // Ordered list
-      if (/^\d+\.\s/.test(line)) {
-        const items = [];
-        while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
-          items.push(lines[i].replace(/^\d+\.\s/, ""));
-          i++;
-        }
-        elements.push(<ol key={key++} className="md-ol">{items.map((it,j)=><li key={j} className="md-li">{renderInline(it)}</li>)}</ol>);
-        continue;
-      }
-
-      // Normal paragraph — collect consecutive non-special lines
-      const paraLines = [];
-      while (i < lines.length && lines[i].trim() &&
-        !lines[i].startsWith("#") && !lines[i].startsWith(">") &&
-        !/^[-*+]\s/.test(lines[i]) && !/^\d+\.\s/.test(lines[i]) &&
-        !/^[-*_]{3,}$/.test(lines[i].trim())) {
-        paraLines.push(lines[i]);
-        i++;
-      }
-      if (paraLines.length) {
-        elements.push(
-          <p key={key++} className="md-p">
-            {paraLines.map((l, j) => (
-              <span key={j}>{renderInline(l)}{j < paraLines.length - 1 && <br/>}</span>
-            ))}
-          </p>
-        );
-      }
-    }
-  });
-
-  return elements;
-}
-
-const Message = ({ msg, isStreaming, isLast, onRegenerate }) => {
-  const isUser = msg.role === "user";
+const Message = ({ msg, isStreaming }) => {
+  const isUser = msg.role==="user";
   return (
     <div className={`msg ${isUser?"msg--user":"msg--ai"}`}>
-      <div className="msg-header">
-        <span className="msg-role">{isUser?"YOU":"IRON MERIDIAN"}</span>
-        <span className="msg-time">{msg.time}</span>
-        {!isUser && isLast && !isStreaming && onRegenerate && (
-          <button className="msg-regen" onClick={onRegenerate} title="Regenerate response">⟳ REGENERATE</button>
-        )}
-      </div>
-      <div className="msg-body">
-        {isUser
-          ? <p className="md-p">{msg.content}</p>
-          : renderMarkdown(msg.content)
-        }
-        {isStreaming && <span className="cursor-blink">▌</span>}
-      </div>
+      <div className="msg-header"><span className="msg-role">{isUser?"YOU":"IRON MERIDIAN"}</span><span className="msg-time">{msg.time}</span></div>
+      <div className="msg-body">{renderContent(msg.content)}{isStreaming&&<span className="cursor-blink">▌</span>}</div>
     </div>
   );
 };
 
-// ── Import Chat Modal ─────────────────────────────────────────────────────────
-const ImportModal = ({ onImport, onClose }) => {
-  const [tab, setTab] = useState("chatgpt");
-  const [text, setText] = useState("");
-  const [error, setError] = useState("");
-  const fileRef = useRef(null);
-
-  const parse = () => {
-    setError("");
-    try {
-      if (tab === "chatgpt") {
-        const data = JSON.parse(text);
-        const convs = Array.isArray(data) ? data : [data];
-        const imported = convs.map(conv => {
-          const msgs = Object.values(conv.mapping || {})
-            .filter(n => n.message?.content?.parts?.length && n.message.role !== "system")
-            .sort((a,b) => (a.message.create_time||0) - (b.message.create_time||0))
-            .map(n => ({
-              role: n.message.role === "assistant" ? "assistant" : "user",
-              content: n.message.content.parts.join(""),
-              time: n.message.create_time
-                ? new Date(n.message.create_time*1000).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})
-                : "--:--",
-            }));
-          return {
-            id: Date.now() + Math.random(),
-            title: `[GPT] ${conv.title || "Imported Chat"}`,
-            preview: msgs[0]?.content?.slice(0,30) || "—",
-            time: "imported",
-            messages: msgs,
-            ...DEFAULT_CHAT_SETTINGS,
-          };
-        });
-        onImport(imported);
-      } else if (tab === "claude") {
-        const data = JSON.parse(text);
-        const convs = Array.isArray(data) ? data : [data];
-        const imported = convs.map(conv => {
-          const msgs = (conv.chat_messages || []).map(m => ({
-            role: m.sender === "human" ? "user" : "assistant",
-            content: Array.isArray(m.content)
-              ? m.content.map(c => c.text || "").join("")
-              : (m.text || m.content || ""),
-            time: m.created_at
-              ? new Date(m.created_at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})
-              : "--:--",
-          }));
-          return {
-            id: Date.now() + Math.random(),
-            title: `[Claude] ${conv.name || "Imported Chat"}`,
-            preview: msgs[0]?.content?.slice(0,30) || "—",
-            time: "imported",
-            messages: msgs,
-            ...DEFAULT_CHAT_SETTINGS,
-          };
-        });
-        onImport(imported);
-      } else {
-        // Plain text: YOU: ... / ASSISTANT: ... blocks
-        const lines = text.split("\n");
-        const msgs = [];
-        let current = null;
-        for (const line of lines) {
-          if (/^(YOU|USER):\s*/i.test(line)) {
-            if (current) msgs.push(current);
-            current = { role:"user", content: line.replace(/^(YOU|USER):\s*/i,""), time:"--:--" };
-          } else if (/^(ASSISTANT|AI|IRON MERIDIAN):\s*/i.test(line)) {
-            if (current) msgs.push(current);
-            current = { role:"assistant", content: line.replace(/^(ASSISTANT|AI|IRON MERIDIAN):\s*/i,""), time:"--:--" };
-          } else if (current) {
-            current.content += "\n" + line;
-          }
-        }
-        if (current) msgs.push(current);
-        if (!msgs.length) throw new Error("No messages found. Use 'YOU:' and 'ASSISTANT:' prefixes.");
-        onImport([{
-          id: Date.now(),
-          title: "[IMPORT] " + (msgs[0]?.content?.slice(0,28) || "Imported Chat"),
-          preview: msgs[0]?.content?.slice(0,30) || "—",
-          time: "imported",
-          messages: msgs,
-          ...DEFAULT_CHAT_SETTINGS,
-        }]);
-      }
-    } catch(e) {
-      setError(e.message || "Parse failed. Check the format and try again.");
-    }
-  };
-
-  const loadFile = e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => setText(ev.target.result);
-    reader.readAsText(file);
-  };
-
-  return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal-panel">
-        <div className="modal-header">
-          <span className="modal-title">// IMPORT CONVERSATION</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="import-tabs">
-          {[["chatgpt","CHATGPT"],["claude","CLAUDE.AI"],["text","PLAIN TEXT"]].map(([id,label])=>(
-            <button key={id} className={`import-tab ${tab===id?"import-tab--active":""}`}
-              onClick={()=>{setTab(id);setText("");setError("");}}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="modal-body">
-          <div className="import-hint">
-            {tab==="chatgpt" && "Paste your ChatGPT export JSON (conversations.json from OpenAI data export), or load the file directly."}
-            {tab==="claude" && "Paste your Claude.ai export JSON (from Settings → Export data), or load the file directly."}
-            {tab==="text" && "Paste a plain text conversation. Prefix each message with YOU: or ASSISTANT:"}
-          </div>
-          <div className="import-file-row">
-            <button className="modal-btn modal-btn--ghost" onClick={()=>fileRef.current?.click()}>⊕ LOAD FILE</button>
-            <input ref={fileRef} type="file" accept=".json,.txt" style={{display:"none"}} onChange={loadFile}/>
-          </div>
-          <textarea className="modal-textarea" style={{height:"180px"}}
-            value={text} onChange={e=>setText(e.target.value)}
-            placeholder={tab==="text"?"YOU: Hello\nASSISTANT: Hello! How can I help?":"Paste JSON here..."}
-            spellCheck={false}/>
-          {error && <div className="import-error">{error}</div>}
-        </div>
-        <div className="modal-footer">
-          <span className="modal-hint">{text.length} chars</span>
-          <button className="modal-btn" onClick={parse} disabled={!text.trim()}>[ IMPORT ]</button>
-        </div>
-      </div>
+const ChatItem = ({ chat, active, onClick, onDelete }) => (
+  <div className={`chat-item ${active?"chat-item--active":""}`} onClick={onClick}>
+    <div className="chat-item-title">{chat.title}</div>
+    <div className="chat-item-meta">
+      <span className="chat-item-preview">{chat.preview}</span>
+      <span className="chat-item-time">{chat.time}</span>
     </div>
-  );
-};
+  </div>
+);
 
-// ── Renameable Chat Item ──────────────────────────────────────────────────────
-const ChatItem = ({ chat, active, onClick, onDelete, onRename }) => {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(chat.title);
-  const inputRef = useRef(null);
-
-  useEffect(() => { if (editing) inputRef.current?.select(); }, [editing]);
-
-  const commit = () => {
-    if (draft.trim()) onRename(chat.id, draft.trim());
-    setEditing(false);
-  };
-
-  return (
-    <div className={`chat-item ${active?"chat-item--active":""}`} onClick={()=>{ if(!editing) onClick(); }}>
-      {editing
-        ? <input ref={inputRef} className="chat-item-rename-input"
-            value={draft} onChange={e=>setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={e=>{ if(e.key==="Enter"){e.preventDefault();commit();} if(e.key==="Escape"){setEditing(false);setDraft(chat.title);} }}
-            onClick={e=>e.stopPropagation()}/>
-        : <div className="chat-item-title" onDoubleClick={e=>{e.stopPropagation();setDraft(chat.title);setEditing(true);}}>{chat.title}</div>
-      }
-      <div className="chat-item-meta">
-        <span className="chat-item-preview">{chat.preview}</span>
-        <span className="chat-item-time">{chat.time}</span>
-      </div>
-    </div>
-  );
-};
+// ── Conversation action dropdown menu ────────────────────────────────────────
 const ConvMenu = ({ onClear, onDelete }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -1120,14 +688,15 @@ const MESH_MODELS = [
 
 const DEFAULT_CHAT_SETTINGS = {
   temperature: 0.7, topP: 0.95, maxTokens: 2048,
+  // Per-chat blueprint state
   blueprintMode: "AUTO",
   customBlueprint: null,
   lockedBlueprint: null,
   blueprintView: "front",
+  // Per-chat mesh model selection
   meshModel: "instantmesh",
+  // Generated 3D SVGs (keyed by view name)
   generatedSVGs: null,
-  // Per-chat directive: { mode: "none"|"global"|"custom", globalId, custom }
-  chatPrompt: { mode: "none", globalId: null, custom: "" },
 };
 
 function hydrateChats(raw) {
@@ -1180,27 +749,14 @@ export default function IronMeridianTerminal() {
   const [openPopup, setOpenPopup] = useState(null);
   const [popupAnchor, setPopupAnchor] = useState({top:62,left:400});
   const [showSysPrompt, setShowSysPrompt] = useState(false);
-  // Global prompt library
-  const [globalPrompts, setGlobalPrompts] = useState(() => {
-    try {
-      const stored = localStorage.getItem("im_global_prompts");
-      if (stored) return JSON.parse(stored);
-      // Migrate old single system prompt if present
-      const old = localStorage.getItem("im_system_prompt");
-      if (old?.trim()) return [{id:1, name:"DEFAULT", content:old.trim()}];
-    } catch {}
-    return [];
-  });
+  const [systemPrompt, setSystemPrompt] = useState(()=>localStorage.getItem("im_system_prompt")||"");
   const [blueprintVisible, setBlueprintVisible] = useState(true);
   const [isGeneratingBp, setIsGeneratingBp] = useState(false);
   const [bpProgress, setBpProgress] = useState(0);
   const [bpStage, setBpStage] = useState("");
   const [serviceStatus, setServiceStatus] = useState("CHECKING");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const [textAlign, setTextAlign] = useState("left");
-  const [showImport, setShowImport] = useState(false);
-  const [searchMode, setSearchMode] = useState(false); // true = full-text search active
-  const [searchResults, setSearchResults] = useState([]);
+  const [textAlign, setTextAlign] = useState("left"); // left | center | right
   const bpJobRef = useRef(null);
 
   // Auto-resize textarea as content grows
@@ -1252,48 +808,10 @@ export default function IronMeridianTerminal() {
     setChats(prev => prev.map(c => c.id!==activeChatId?c:{...c,[key]:val}));
   }, [activeChatId]);
 
-  // ── Token estimation (must be after activeChat) ──
-  const estimatedTokens = Math.round(
-    (activeChat?.messages || []).reduce((acc, m) => acc + (m.content?.length || 0), 0) / 4
-  );
-  const tokenPct = Math.min((estimatedTokens / Math.max(contextTokens, 1)) * 100, 100);
-
-  // ── Resolve active system prompt for this chat ──
-  const chatPrompt = activeChat?.chatPrompt ?? DEFAULT_CHAT_SETTINGS.chatPrompt;
-  const resolvedSystemPrompt = (() => {
-    if (chatPrompt.mode === "custom") return chatPrompt.custom?.trim() || "";
-    if (chatPrompt.mode === "global") {
-      const gp = globalPrompts.find(p => p.id === chatPrompt.globalId);
-      return gp?.content?.trim() || "";
-    }
-    return "";
-  })();
-  const hasActiveDirective = resolvedSystemPrompt.length > 0;
-
   // ── Persistence ──
   useEffect(()=>{ try{localStorage.setItem("im_chats",JSON.stringify(chats));}catch{} },[chats]);
   useEffect(()=>{ try{localStorage.setItem("im_active_chat",String(activeChatId));}catch{} },[activeChatId]);
-  useEffect(()=>{ try{localStorage.setItem("im_global_prompts",JSON.stringify(globalPrompts));}catch{} },[globalPrompts]);
-
-  // ── Full-text search ──
-  useEffect(() => {
-    if (!searchQuery.trim()) { setSearchMode(false); setSearchResults([]); return; }
-    setSearchMode(true);
-    const q = searchQuery.toLowerCase();
-    const results = [];
-    chats.forEach(chat => {
-      chat.messages.forEach((msg, idx) => {
-        const pos = msg.content.toLowerCase().indexOf(q);
-        if (pos === -1) return;
-        // Extract a snippet around the match
-        const start = Math.max(0, pos - 30);
-        const end   = Math.min(msg.content.length, pos + q.length + 60);
-        const snippet = (start>0?"…":"") + msg.content.slice(start,end) + (end<msg.content.length?"…":"");
-        results.push({ chatId:chat.id, chatTitle:chat.title, msgIdx:idx, role:msg.role, snippet, matchPos:pos-start+(start>0?1:0), matchLen:q.length });
-      });
-    });
-    setSearchResults(results.slice(0, 50)); // cap at 50
-  }, [searchQuery, chats]);
+  useEffect(()=>{ localStorage.setItem("im_system_prompt",systemPrompt); },[systemPrompt]);
 
   // ── Ollama polling ──
   useEffect(()=>{
@@ -1384,7 +902,7 @@ export default function IronMeridianTerminal() {
     const aiMsg={id:aiMsgId,role:"assistant",content:"",time:aiTime};
     setChats(prev=>prev.map(c=>c.id!==activeChatId?c:{...c,messages:[...c.messages,aiMsg]}));
     const chat=updatedChats.find(c=>c.id===activeChatId);
-    const sysMessages=resolvedSystemPrompt?[{role:"system",content:resolvedSystemPrompt}]:[];
+    const sysMessages=systemPrompt.trim()?[{role:"system",content:systemPrompt.trim()}]:[];
     const ollamaMessages=[...sysMessages,...chat.messages.map(m=>({role:m.role,content:m.content}))];
     try {
       const ctrl=new AbortController(); abortRef.current=ctrl;
@@ -1405,58 +923,7 @@ export default function IronMeridianTerminal() {
     } catch(err){
       if(err.name!=="AbortError") setChats(prev=>prev.map(c=>c.id!==activeChatId?c:{...c,messages:c.messages.map(m=>m.id===aiMsgId?{...m,content:"[SIGNAL LOST — OLLAMA UNREACHABLE]\n\nEnsure Ollama is running: `ollama serve`"}:m)}));
     } finally { setIsStreaming(false); abortRef.current=null; }
-  },[input,isStreaming,chats,activeChatId,selectedModel,temperature,topP,maxTokens,resolvedSystemPrompt]);
-
-  const renameChat = (id, newTitle) => {
-    setChats(prev => prev.map(c => c.id!==id ? c : {...c, title: newTitle}));
-  };
-
-  const importChats = (imported) => {
-    setChats(prev => [...imported.map(c=>({...c, id:Date.now()+Math.random()})), ...prev]);
-    setShowImport(false);
-  };
-
-  const regenerate = useCallback(async () => {
-    if (isStreaming) return;
-    const msgs = activeChat?.messages || [];
-    // Find last user message and strip the last AI response
-    const lastUserIdx = [...msgs].reverse().findIndex(m => m.role === "user");
-    if (lastUserIdx === -1) return;
-    const cutIdx = msgs.length - 1 - lastUserIdx;
-    const trimmed = msgs.slice(0, cutIdx + 1);
-    // Remove any trailing AI messages after the last user message
-    const cleanedMsgs = trimmed.filter((_, i) => i <= cutIdx);
-    setChats(prev => prev.map(c => c.id!==activeChatId ? c : {...c, messages: cleanedMsgs}));
-    // Re-trigger send with the last user message already in history
-    const lastUserMsg = cleanedMsgs[cleanedMsgs.length - 1];
-    if (!lastUserMsg) return;
-    setIsStreaming(true);
-    const aiMsgId = Date.now();
-    const aiTime = new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
-    const aiMsg = {id:aiMsgId, role:"assistant", content:"", time:aiTime};
-    setChats(prev=>prev.map(c=>c.id!==activeChatId?c:{...c,messages:[...cleanedMsgs,aiMsg]}));
-    const sysMessages = resolvedSystemPrompt?[{role:"system",content:resolvedSystemPrompt}]:[];
-    const ollamaMessages = [...sysMessages, ...cleanedMsgs.map(m=>({role:m.role,content:m.content}))];
-    try {
-      const ctrl = new AbortController(); abortRef.current = ctrl;
-      const resp = await fetch("http://localhost:11434/api/chat",{
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:selectedModel,messages:ollamaMessages,stream:true,options:{temperature,top_p:topP,num_predict:maxTokens}}),
-        signal:ctrl.signal,
-      });
-      if(!resp.ok) throw new Error("Ollama error");
-      const reader=resp.body.getReader(); const decoder=new TextDecoder(); let full="";
-      while(true){
-        const {done,value}=await reader.read(); if(done) break;
-        const lines=decoder.decode(value,{stream:true}).split("\n").filter(Boolean);
-        for(const line of lines){
-          try{const j=JSON.parse(line);if(j.message?.content){full+=j.message.content;setChats(prev=>prev.map(c=>c.id!==activeChatId?c:{...c,messages:c.messages.map(m=>m.id===aiMsgId?{...m,content:full}:m)}));}if(j.done)break;}catch{}
-        }
-      }
-    } catch(err) {
-      if(err.name!=="AbortError") setChats(prev=>prev.map(c=>c.id!==activeChatId?c:{...c,messages:c.messages.map(m=>m.id===aiMsgId?{...m,content:"[SIGNAL LOST]"}:m)}));
-    } finally { setIsStreaming(false); abortRef.current=null; }
-  }, [isStreaming, activeChat, activeChatId, selectedModel, temperature, topP, maxTokens, resolvedSystemPrompt]);
+  },[input,isStreaming,chats,activeChatId,selectedModel,temperature,topP,maxTokens,systemPrompt]);
 
   const stopGeneration = () => { abortRef.current?.abort(); };
 
@@ -1683,10 +1150,8 @@ Return ONLY valid JSON matching this schema (no markdown, no explanation):
           grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;
           padding:0 16px;height:22px;max-height:22px;overflow:hidden;
           border-top:1px solid var(--border-accent);background:var(--panel);
-          font-size:8px;color:var(--text-dim);letter-spacing:.08em;
+          font-size:8px;color:var(--text-dim);letter-spacing:.1em;
         }
-        .sb-item{white-space:nowrap;letter-spacing:.1em;}
-        .sb-sep{color:var(--border-accent);margin:0 8px;user-select:none;}
 
         /* ── Scanlines ── */
         .scanlines{position:fixed;inset:0;pointer-events:none;z-index:100;}
@@ -1797,54 +1262,6 @@ Return ONLY valid JSON matching this schema (no markdown, no explanation):
         }
         .chat-item:hover .chat-item-delete{opacity:1;}
         .chat-item-delete:hover{color:var(--red);}
-
-        /* ── Full-text search results ── */
-        .search-hint{font-size:8px;color:var(--text-dim);letter-spacing:.1em;margin-top:4px;}
-        .search-empty{padding:16px 12px;font-size:9px;color:var(--text-dim);letter-spacing:.1em;text-align:center;}
-        .search-result{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s;}
-        .search-result:hover{background:var(--red-glow2);}
-        .search-result-chat{font-size:10px;color:var(--text);letter-spacing:.04em;margin-bottom:2px;}
-        .search-result-role{font-size:8px;color:var(--red);letter-spacing:.15em;margin-bottom:3px;}
-        .search-result-snippet{font-size:9px;color:var(--text-dim);line-height:1.45;word-break:break-word;}
-        .search-highlight{background:rgba(204,34,0,.25);color:var(--text);padding:0 1px;}
-
-        /* ── Prompt Manager ── */
-        .pm-list-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s;}
-        .pm-list-item:hover{background:var(--red-glow2);}
-        .pm-list-item--active{background:var(--red-glow);border-left:2px solid var(--red);}
-        .pm-list-name{font-size:10px;color:var(--text);letter-spacing:.06em;flex:1;overflow:hidden;text-overflow:ellipsis;}
-        .pm-list-del{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:9px;padding:2px 4px;flex-shrink:0;}
-        .pm-list-del:hover{color:var(--red);}
-        .pm-name-input{width:100%;background:var(--bg);border:1px solid var(--border-accent);color:var(--red);font-family:var(--mono);font-size:11px;font-weight:700;padding:5px 8px;outline:none;letter-spacing:.1em;}
-        .pm-name-input:focus{border-color:var(--red-dim);}
-        .pm-radio-row{display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:6px 0;border-bottom:1px solid var(--border);}
-        .pm-radio-row--sub{padding-left:8px;}
-        .pm-radio-row input[type="radio"]{margin-top:2px;accent-color:var(--red);flex-shrink:0;}
-        .pm-radio-label{font-size:10px;color:var(--text);letter-spacing:.08em;font-family:var(--mono);flex-shrink:0;}
-        .pm-radio-desc{font-size:9px;color:var(--text-dim);letter-spacing:.04em;line-height:1.4;}
-
-        /* ── Directive option rows (terminal style) ── */
-        .directive-opt{
-          display:flex;align-items:flex-start;gap:10px;
-          padding:8px 10px;border:1px solid var(--border);
-          cursor:pointer;transition:all .12s;
-        }
-        .directive-opt:hover{border-color:var(--red-dim);background:var(--red-glow2);}
-        .directive-opt--active{border-color:var(--red);background:var(--red-glow);}
-        .directive-opt--sub{border-top:none;}
-        .directive-opt-radio{
-          width:10px;height:10px;border:1px solid var(--red-dim);
-          flex-shrink:0;margin-top:2px;position:relative;transition:all .12s;
-        }
-        .directive-opt--active .directive-opt-radio{border-color:var(--red);}
-        .directive-opt--active .directive-opt-radio::after{
-          content:'';position:absolute;inset:2px;background:var(--red);
-          box-shadow:0 0 4px var(--red);
-        }
-        .directive-opt-body{display:flex;flex-direction:column;gap:2px;flex:1;}
-        .directive-opt-label{font-size:10px;color:var(--text);letter-spacing:.1em;font-family:var(--mono);}
-        .directive-opt--active .directive-opt-label{color:var(--red);}
-        .directive-opt-desc{font-size:8px;color:var(--text-dim);letter-spacing:.04em;line-height:1.4;}
 
         /* ── Text alignment toggle ── */
         .align-btn{
@@ -2075,77 +1492,9 @@ Return ONLY valid JSON matching this schema (no markdown, no explanation):
         .conv-menu-icon{font-size:10px;width:12px;text-align:center;flex-shrink:0;}
         .conv-menu-divider{height:1px;background:var(--border);}
 
-        /* ── Markdown styles ── */
-        .md-p{margin:0 0 6px;line-height:1.65;font-size:12px;color:var(--text);}
-        .md-p:last-child{margin-bottom:0;}
-        .md-h{font-family:var(--display);font-weight:700;color:var(--text);letter-spacing:.08em;margin:10px 0 4px;}
-        .md-h1{font-size:16px;color:var(--red);}
-        .md-h2{font-size:14px;border-bottom:1px solid var(--border-accent);padding-bottom:3px;}
-        .md-h3{font-size:13px;color:var(--text-mid);}
-        .md-h4{font-size:12px;color:var(--text-dim);}
-        .md-bold{color:var(--text);font-weight:700;}
-        .md-italic{font-style:italic;color:var(--text-mid);}
-        .md-strike{text-decoration:line-through;opacity:.6;}
-        .md-inline-code{
-          background:var(--panel);border:1px solid var(--border-accent);
-          color:#a8c0b0;font-family:var(--mono);font-size:10px;
-          padding:1px 5px;border-radius:0;
-        }
-        .md-blockquote{
-          border-left:2px solid var(--red-dim);margin:6px 0;padding:4px 10px;
-          color:var(--text-mid);font-style:italic;background:var(--panel);
-        }
-        .md-ul,.md-ol{margin:4px 0 6px 16px;padding:0;}
-        .md-li{margin:2px 0;font-size:12px;color:var(--text);line-height:1.55;}
-        .md-ul .md-li{list-style:none;}
-        .md-ul .md-li::before{content:"›";color:var(--red);margin-right:6px;}
-        .md-ol{list-style:decimal;}
-        .md-hr{border:none;border-top:1px solid var(--border-accent);margin:10px 0;opacity:.6;}
-
-        /* ── Regenerate button ── */
-        .msg-regen{
-          background:none;border:1px solid var(--border-accent);color:var(--text-dim);
-          font-family:var(--mono);font-size:8px;padding:1px 7px;cursor:pointer;
-          letter-spacing:.1em;transition:all .12s;margin-left:auto;
-        }
-        .msg-regen:hover{border-color:var(--red-dim);color:var(--red);}
-        .msg-header{display:flex;align-items:center;gap:10px;width:100%;}
-
-        /* ── Chat rename input ── */
-        .chat-item-rename-input{
-          width:100%;background:var(--bg);border:none;border-bottom:1px solid var(--red-dim);
-          color:var(--text);font-family:var(--mono);font-size:11px;
-          padding:1px 4px;outline:none;letter-spacing:.03em;
-        }
-
-        /* ── Token bar ── */
-        .token-bar-wrap{margin-top:6px;}
-        .token-bar-label{display:flex;justify-content:space-between;font-size:8px;color:var(--text-dim);letter-spacing:.08em;margin-bottom:3px;}
-        .token-bar-val{font-size:8px;}
-        .token-bar-val--warn{color:#cc8800;}
-        .token-bar-val--danger{color:var(--red);}
-        .token-bar-track{height:2px;background:var(--border-accent);}
-        .token-bar-fill{height:100%;background:var(--green);transition:width .4s ease;}
-        .token-bar-fill--warn{background:#cc8800;}
-        .token-bar-fill--danger{background:var(--red);box-shadow:0 0 4px var(--red);}
-
-        /* ── Import modal extras ── */
-        .import-tabs{display:flex;border-bottom:1px solid var(--border-accent);}
-        .import-tab{
-          flex:1;background:none;border:none;border-bottom:2px solid transparent;
-          color:var(--text-dim);font-family:var(--mono);font-size:9px;
-          padding:8px 4px;cursor:pointer;letter-spacing:.12em;transition:all .12s;
-        }
-        .import-tab:hover{color:var(--text);}
-        .import-tab--active{color:var(--red);border-bottom-color:var(--red);}
-        .import-hint{font-size:9px;color:var(--text-dim);letter-spacing:.05em;line-height:1.5;margin-bottom:8px;}
-        .import-file-row{margin-bottom:8px;}
-        .import-error{font-size:9px;color:var(--red);margin-top:6px;padding:6px 8px;border:1px solid var(--red-dim);background:var(--red-glow2);}
-
-        /* ── Import button in sidebar ── */
-        .sidebar-btn--import{font-size:9px;width:auto;padding:0 7px;letter-spacing:.06em;}
-        .statusbar-left{display:flex;align-items:center;overflow:hidden;}
-        .statusbar-right{display:flex;align-items:center;flex-shrink:0;}
+        /* ── Status Bar ── */
+        .statusbar-left{display:flex;gap:16px;overflow:hidden;white-space:nowrap;}
+        .statusbar-right{display:flex;gap:16px;flex-shrink:0;white-space:nowrap;}
         .status-dot{width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block;margin-right:5px;box-shadow:0 0 4px var(--green);}
       `}</style>
 
@@ -2157,17 +1506,8 @@ Return ONLY valid JSON matching this schema (no markdown, no explanation):
         {openPopup==="topp" && <SettingsPopup anchor={popupAnchor} label="TOP_P" type="slider" min={0} max={1} step={0.01} value={topP} onChange={v=>setChatSetting("topP",v)} onClose={()=>setOpenPopup(null)}/>}
         {openPopup==="maxtok" && <SettingsPopup anchor={popupAnchor} label="MAX TOKENS" type="number" min={64} max={32768} step={64} value={maxTokens} onChange={v=>setChatSetting("maxTokens",v)} onClose={()=>setOpenPopup(null)}/>}
 
-        {/* ── Import Modal ── */}
-        {showImport && <ImportModal onImport={importChats} onClose={()=>setShowImport(false)}/>}
-
-        {/* ── Prompt Manager Modal ── */}
-        {showSysPrompt && <PromptManager
-          globalPrompts={globalPrompts}
-          onSaveGlobals={setGlobalPrompts}
-          chatPrompt={activeChat?.chatPrompt ?? DEFAULT_CHAT_SETTINGS.chatPrompt}
-          onSaveChatPrompt={cp => setChatSetting("chatPrompt", cp)}
-          onClose={()=>setShowSysPrompt(false)}
-        />}
+        {/* ── System Prompt Modal ── */}
+        {showSysPrompt && <SystemPromptModal value={systemPrompt} onChange={setSystemPrompt} onClose={()=>setShowSysPrompt(false)}/>}
 
         {/* ── Top Bar ── */}
         <header className="topbar">
@@ -2212,37 +1552,14 @@ Return ONLY valid JSON matching this schema (no markdown, no explanation):
             <span className="sidebar-section-label">// CHATS</span>
             <div className="sidebar-section-actions">
               <button className="sidebar-btn sidebar-btn--sys" onClick={()=>setShowSysPrompt(true)} title="Edit system prompt">SYS</button>
-              <button className="sidebar-btn sidebar-btn--import" onClick={()=>setShowImport(true)} title="Import conversation">IMP</button>
               <button className="sidebar-btn" onClick={newChat} title="New Chat">+</button>
             </div>
           </div>
           <div className="search-wrap">
-            <input className="search-input" placeholder="SEARCH ALL SESSIONS..."
-              value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}
-              onKeyDown={e=>{ if(e.key==="Escape"){setSearchQuery(""); setSearchMode(false);} }}/>
-            {searchMode && <div className="search-hint">{searchResults.length} result{searchResults.length!==1?"s":""}</div>}
+            <input className="search-input" placeholder="SEARCH SESSIONS..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/>
           </div>
           <div className="chat-list">
-            {searchMode ? (
-              searchResults.length === 0
-                ? <div className="search-empty">NO RESULTS</div>
-                : searchResults.map((r,i) => {
-                    const before = r.snippet.slice(0, r.matchPos);
-                    const match  = r.snippet.slice(r.matchPos, r.matchPos + r.matchLen);
-                    const after  = r.snippet.slice(r.matchPos + r.matchLen);
-                    return (
-                      <div key={i} className="search-result" onClick={()=>{ switchChat(r.chatId); setSearchQuery(""); }}>
-                        <div className="search-result-chat">{r.chatTitle}</div>
-                        <div className="search-result-role">{r.role === "user" ? "YOU" : "IRON MERIDIAN"}</div>
-                        <div className="search-result-snippet">
-                          {before}<span className="search-highlight">{match}</span>{after}
-                        </div>
-                      </div>
-                    );
-                  })
-            ) : (
-              filteredChats.map(c=><ChatItem key={c.id} chat={c} active={c.id===activeChatId} onClick={()=>switchChat(c.id)} onDelete={deleteChat} onRename={renameChat}/>)
-            )}
+            {filteredChats.map(c=><ChatItem key={c.id} chat={c} active={c.id===activeChatId} onClick={()=>switchChat(c.id)} onDelete={deleteChat}/>)}
           </div>
           <div className="model-panel">
             <div className="model-panel-label">// CURRENT MODEL</div>
@@ -2259,20 +1576,7 @@ Return ONLY valid JSON matching this schema (no markdown, no explanation):
                   : <div className="model-name">{selectedModel}</div>}
                 <div className="model-row"><span className="model-key">CONTEXT WINDOW</span><span className="model-val">{contextTokens.toLocaleString()}</span></div>
                 <div className="model-row"><span className="model-key">TEMPERATURE</span><span className="model-val">{temperature.toFixed(2)}</span></div>
-                <div className={`sys-prompt-indicator ${hasActiveDirective?"active":""}`}><span className="sys-dot"/>{hasActiveDirective?"DIRECTIVE ACTIVE":"NO DIRECTIVE"}</div>
-                {/* Token usage bar */}
-                <div className="token-bar-wrap">
-                  <div className="token-bar-label">
-                    <span>CONTEXT USED</span>
-                    <span className={`token-bar-val ${tokenPct>90?"token-bar-val--danger":tokenPct>70?"token-bar-val--warn":""}`}>
-                      {estimatedTokens.toLocaleString()} / {contextTokens.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="token-bar-track">
-                    <div className={`token-bar-fill ${tokenPct>90?"token-bar-fill--danger":tokenPct>70?"token-bar-fill--warn":""}`}
-                      style={{width:`${tokenPct}%`}}/>
-                  </div>
-                </div>
+                <div className={`sys-prompt-indicator ${systemPrompt.trim()?"active":""}`}><span className="sys-dot"/>{systemPrompt.trim()?"DIRECTIVE ACTIVE":"NO DIRECTIVE"}</div>
               </div>
             </div>
           </div>
@@ -2304,17 +1608,9 @@ Return ONLY valid JSON matching this schema (no markdown, no explanation):
             </div>
           </div>
           <div className="messages-area" style={{textAlign}}>
-            {(activeChat?.messages||[]).map((msg,i)=>{
-              const msgs = activeChat.messages;
-              const isLast = i === msgs.length - 1;
-              return (
-                <Message key={i} msg={msg}
-                  isStreaming={isStreaming && isLast && msg.role==="assistant"}
-                  isLast={isLast}
-                  onRegenerate={msg.role==="assistant" ? regenerate : null}
-                />
-              );
-            })}
+            {(activeChat?.messages||[]).map((msg,i)=>(
+              <Message key={i} msg={msg} isStreaming={isStreaming&&i===(activeChat.messages.length-1)&&msg.role==="assistant"}/>
+            ))}
             {(activeChat?.messages||[]).length===0&&(
               <div style={{color:"var(--text-dim)",fontSize:"11px",letterSpacing:".08em",textAlign:"center",marginTop:"60px",opacity:.5}}>— AWAITING INPUT —</div>
             )}
@@ -2331,7 +1627,7 @@ Return ONLY valid JSON matching this schema (no markdown, no explanation):
                 : <button className="send-btn" onClick={sendMessage} disabled={!input.trim()}>SEND ›</button>}
             </div>
             <div className="input-meta">
-              <span>INPUT MODE: COMMAND{hasActiveDirective?" · DIRECTIVE ARMED":""}</span>
+              <span>INPUT MODE: COMMAND{systemPrompt.trim()?" · DIRECTIVE ARMED":""}</span>
               <span>SHIFT+ENTER FOR NEWLINE</span>
             </div>
           </div>
@@ -2451,17 +1747,14 @@ Return ONLY valid JSON matching this schema (no markdown, no explanation):
         {/* ── Status Bar ── */}
         <footer className="statusbar">
           <div className="statusbar-left">
-            <span className="sb-item">INPUT MODE: <span style={{color:"var(--text)"}}>COMMAND</span></span>
-            <span className="sb-sep">·</span>
-            <span className="sb-item">ENCRYPTION: <span style={{color:"var(--green)"}}>ON</span></span>
-            <span className="sb-sep">·</span>
-            <span className="sb-item">BLUEPRINT: <span style={{color:blueprintMode==="AUTO"?"var(--green)":blueprintMode==="LOCKED"?"#cc8800":"var(--red)"}}>{blueprintMode}</span></span>
-            {hasActiveDirective && <><span className="sb-sep">·</span><span className="sb-item" style={{color:"var(--red)"}}>DIRECTIVE ARMED</span></>}
+            <span>INPUT MODE: COMMAND</span>
+            <span>ENCRYPTION: <span style={{color:"var(--green)"}}>ON</span></span>
+            <span>BLUEPRINT: <span style={{color:blueprintMode==="AUTO"?"var(--green)":blueprintMode==="LOCKED"?"#cc8800":"var(--red)"}}>{blueprintMode}</span></span>
           </div>
           <div className="statusbar-right">
-            <span className="sb-item">LINK: <span style={{color:"var(--text)"}}>LOCALHOST</span></span>
-            <span className="sb-sep">·</span>
-            <span className="sb-item"><span className="status-dot"/>SYSTEM NOMINAL</span>
+            <span>LINK: LOCALHOST</span>
+            <span><span className="status-dot"/>SYSTEM NOMINAL</span>
+            <span>_</span>
           </div>
         </footer>
       </div>

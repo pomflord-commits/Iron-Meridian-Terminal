@@ -1,0 +1,29 @@
+{
+  "brief_hash": "659e856bcfa00ccd",
+  "brief": {
+    "type": "drone",
+    "name": "TRIANGDRONE",
+    "role": "Unmanned Aerial Vehicle (UAV)",
+    "height": "\u2014",
+    "weight": "\u2014",
+    "specs": [
+      [
+        "WINGSPAN",
+        "1.5m"
+      ],
+      [
+        "NUMBER OF WINGS",
+        "3"
+      ]
+    ],
+    "systems": [
+      "Remote Control System",
+      "GPS Navigation System",
+      "Computer Algorithms for Flight Path Guid"
+    ],
+    "design_notes": "Triangular shape offers improved aerodynamics and stability, making it suitable for narrow spaces.",
+    "_concept_image_path": "/home/user/iron-meridian-terminal/service/cache/1780972884010/concept.png"
+  },
+  "mesh_model_used": "triposr",
+  "generated_at": 1780975840.6461482
+}

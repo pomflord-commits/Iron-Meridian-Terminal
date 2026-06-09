@@ -1,0 +1,35 @@
+# Iron Meridian Blueprint Service — Python Dependencies
+# ======================================================
+# Install with: pip install -r requirements.txt
+#
+# For ROCm (AMD GPU) users, replace the torch line with:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm6.1
+
+# ── Core service ──────────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+httpx>=0.27.0
+pydantic>=2.0.0
+
+# ── 3D processing ─────────────────────────────────────────────────────────────
+trimesh>=4.3.0
+numpy>=1.26.0
+
+# ── SVG rendering ─────────────────────────────────────────────────────────────
+# svg3d is installed from source — not on PyPI yet
+# pip install git+https://github.com/prideout/svg3d.git
+svg3d
+
+# ── Optional mesh model dependencies (install when upgrading to Phase 2) ──────
+# Shap-E:
+#   pip install git+https://github.com/openai/shap-e.git
+#
+# TripoSR:
+#   pip install git+https://github.com/VAST-AI-Research/TripoSR.git
+#
+# InstantMesh:
+#   git clone https://github.com/TencentARC/InstantMesh
+#   pip install -r InstantMesh/requirements.txt
+#
+# OpenLRM:
+#   pip install openlrm

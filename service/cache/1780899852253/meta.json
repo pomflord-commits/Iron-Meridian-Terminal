@@ -1,0 +1,32 @@
+{
+  "brief_hash": "bd356c256a105a0b",
+  "brief": {
+    "type": "mech",
+    "name": "ARMOREDCARX",
+    "role": "vehicle design",
+    "height": "\u2014",
+    "weight": "\u2014",
+    "specs": [
+      [
+        "PURPOSE",
+        "Police protection"
+      ],
+      [
+        "MATERIALS AND ARMOR ",
+        "Steel Plate, GFRP, Titan"
+      ],
+      [
+        "DESIGN CONSIDERATION",
+        "Bulletproof doors, reinf"
+      ]
+    ],
+    "systems": [
+      "Emergency Exits",
+      "Radar Surveillance System"
+    ],
+    "design_notes": "Bulletproof armored vehicle with enhanced safety features and robust design for optimal protection.",
+    "_concept_image_path": "/home/user/iron-meridian-terminal/service/cache/1780899852253/concept.png"
+  },
+  "mesh_model_used": "instantmesh",
+  "generated_at": 1780975903.3747566
+}

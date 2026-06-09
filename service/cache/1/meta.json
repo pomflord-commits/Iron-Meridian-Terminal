@@ -1,0 +1,33 @@
+{
+  "brief_hash": "184aed6ba744b17d",
+  "brief": {
+    "type": "mech",
+    "name": "IRON MERIDIAN",
+    "role": "Shock Assault / Breacher",
+    "height": "4.2m",
+    "weight": "8.7 tons",
+    "specs": [
+      [
+        "CHASSIS",
+        "Reinforced composite arm"
+      ],
+      [
+        "POWER PLANT",
+        "Compact fusion core"
+      ],
+      [
+        "MOBILITY",
+        "Hydraulic legs with enha"
+      ]
+    ],
+    "systems": [
+      "Advanced target acquisition system",
+      "Urban terrain mapping system",
+      "Low-signature movement mode"
+    ],
+    "design_notes": "A compact, agile mech designed to dominate tight corridors and close-quarters engagements.",
+    "_concept_image_path": "/home/user/iron-meridian-terminal/service/cache/1/concept.png"
+  },
+  "mesh_model_used": "triposr",
+  "generated_at": 1780975981.310752
+}
